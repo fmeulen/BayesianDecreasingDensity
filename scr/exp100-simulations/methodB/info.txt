@@ -1,0 +1,10 @@
+Average acceptance probability equals: 0.363
+Number of iterations: 50000
+mh_step = 0.4
+
+elapsed time 128.878528806
+
+---- Prior specification ----
+method: B
+concentration parameter: 1
+extra_pars= 0
