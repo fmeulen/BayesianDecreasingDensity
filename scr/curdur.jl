@@ -1,17 +1,17 @@
 using Distributions
-using CSV
+using DelimitedFiles
 using QuadGK
+using LinearAlgebra
+using CSV
 
 workdir = @__DIR__
 println(workdir)
 cd(workdir)
 
-
-#using Plots
 include("bd_funcdefs.jl")
 
-# specify the prior
-α = 1 # concentration par
+######## specify the prior
+α = 1.0                       # concentration par
 method = "D"
 base_density, base_measure, extra_pars = setprior(method)
 
@@ -22,7 +22,6 @@ IT = 50000
 # read data
 y = readdlm("curdur.csv",',', header=true)[1][:,2]
 x = sort(y)[1:618]
-
 # sample of size 100 from Exp(1) distribution
 #x =readcsv("exp100.csv")[2:end,2]
 
@@ -50,17 +49,25 @@ sum_acc = 0
 postmean = zeros(IT,lg)
 
 postτ = ones(IT) # only relevant with mixture of Pareto base measure
-postτ[1] =10
+postτ[1] = 10.0
+
+
+if method=="D"
+    αα, λ, β = extra_pars[3], extra_pars[4], extra_pars[5]
+end
+
+start = time()
 
 # MH algorithm by Neal
 for it in 2:IT
+    global sum_acc
   if method=="D"
       extra_pars[2] = postτ[it-1]
   end
   configs[it] = update_config(configs[it-1],n,x, ψ0,method,extra_pars)
   configs[it], sum_acc = update_θ(configs[it],x,mh_step,sum_acc,method,extra_pars)
   if method=="D"
-      postτ[it] = rand_trunc_gamma(λ + configs[it].n_tables * αα,β,minimum(configs[it].θ))
+      postτ[it] = rand_trunc_gamma(λ + configs[it].n_tables * αα, β, minimum(configs[it].θ))
   end
 
   if it%100==0   println(it) end
@@ -71,8 +78,7 @@ for it in 2:IT
   end
 end
 
-elapsed_time = toc()
-
+elapsedtime = time() - start
 # compute average acc prob for mh updates for theta
 nθupdates = sum([configs[it].n_tables for it in 2:IT])
 
@@ -81,15 +87,15 @@ println(mean_acc)
 
 # write results to csv file
 postmean[1,:] = grid
-writecsv("./out/postmean.csv",postmean)
-writecsv("./out/post_tau.csv",postτ)
+writedlm("./out/postmean.csv",postmean)
+writedlm("./out/post_tau.csv",postτ)
 
 # save info to file
 facc = open("./out/info.txt","w")
-write(facc, "Average acceptance probability equals: ",string(round(mean_acc,3)),"\n")
+write(facc, "Average acceptance probability equals: ",string(round(mean_acc;digits=3)),"\n")
 write(facc, "Number of iterations: ",string(IT),"\n")
 write(facc, "mh_step = ",string(mh_step),"\n\n")
-write(facc, "elapsed time ",string(elapsed_time), "\n\n")
+write(facc, "elapsed time ",string(elapsedtime), "\n\n")
 write(facc, "---- Prior specification ----","\n")
 write(facc, "method: ", string(method),"\n")
 write(facc, "concentration parameter: ", string(α),"\n")

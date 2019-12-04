@@ -1,26 +1,32 @@
+"""
+    Set the prior used in Bayesian estimation of a decreasing density
+
+    function call is
+        base_density, base_measure, extra_pars = setprior(method)
+"""
 function setprior(method)
     if method=="A"
         base_density = (θ) -> exp(-1/θ-θ) * (θ>0) / 0.27973176363304486
         extra_pars = 0 # no extra pars
     elseif method=="B"
         base_measure = Gamma(2.0,1.0)
-        base_density(θ) = pdf(base_measure,θ)
+        base_density = (θ) -> pdf(base_measure,θ)
         extra_pars = 0 # no extra pars
     elseif method=="C"
-        αα = 1
+        αα = 1.0
         τ = 0.005
-        extra_pars = [αα,τ] # no extra pars
+        extra_pars = [αα, τ] # no extra pars
         base_measure = Pareto(αα,τ) # second argument is the support parameter
-        base_density(θ) = pdf(base_measure,θ)
+        base_density = (θ) ->  pdf(base_measure,θ)
     elseif method=="D"
     # add mixture of Pareto
-        αα = 1
-        λ = 2 # prior on τ (which is the Pareto threshold) is assumed Ga(λ,β)
-        β = 1
+        αα = 1.0
+        λ = 2.0 # prior on τ (which is the Pareto threshold) is assumed Ga(λ,β)
+        β = 1.0
         τ = 0.1
-        extra_pars = [αα,τ] # no extra pars
+        extra_pars = [αα,τ, αα, λ, β] # no extra pars
         base_measure = Pareto(αα,τ) # second argument is the support parameter
-        base_density(θ) = pdf(base_measure,θ)
+        base_density = (θ) ->  pdf(base_measure,θ)
     end
     base_density, base_measure, extra_pars
 end
@@ -83,7 +89,8 @@ function update_config(config,n,x,ψ0,method,extra_pars)
     configN = deepcopy(config)
     for i in 1:n # loop over all labels
         # find table of the i-th customer
-        ind = find(isequal(configN.labels[i]),configN.tableIDs)
+        #ind = find(isequal(configN.labels[i]),configN.tableIDs) # old
+        ind = findall(x->x==configN.labels[i], configN.tableIDs)[1] # new dec 2019
         # remove i-th customer from the table counts
         configN.counts[ind] += -1
         a = configN.counts[ind]
@@ -106,7 +113,7 @@ function update_config(config,n,x,ψ0,method,extra_pars)
         #   w[j] = ψ(x[i],configN.θ[j]) * configN.counts[j]
         # end
         # w[J+1] = ψ0[i]
-        w =[ψ(x[i],configN.θ[j]) * configN.counts[j] for j in eachindex configN.n_tables]
+        w =[ψ(x[i],configN.θ[j]) * configN.counts[j] for j in eachindex(configN.n_tables)]
         append!(w,ψ0[i])
 
         # choose new table for customer i
@@ -133,7 +140,8 @@ end
 
 function update_θ(config,x,mh_step,sum_acc,method,extra_pars)
     for k in 1:config.n_tables
-        ind =find(isequal(config.tableIDs[k]),config.labels)  # find observation indices in table keys
+        #ind =find(isequal(config.tableIDs[k]),config.labels)  # OLD find observation indices in table keys
+        ind = findall(x->x==config.tableIDs[k], config.labels)[1] # new dec 2019
         config.θ[k], acc =sample_θ(config.θ[k], x[ind],mh_step,method,extra_pars)
         sum_acc += acc
     end
