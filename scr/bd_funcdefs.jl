@@ -6,6 +6,7 @@
 """
 function setprior(method)
     if method=="A"
+        base_measure = 0 # apparently not needed
         base_density = (θ) -> exp(-1/θ-θ) * (θ>0) / 0.27973176363304486
         extra_pars = 0 # no extra pars
     elseif method=="B"
@@ -42,7 +43,7 @@ mutable struct Config
 end
 
 
-function postmean0_simulation(x,IT, mh_step, α, p0, method, config_init,extra_pars)
+function postmean0_simulation(x,IT, std_mhstep, α, p0, method, config_init,extra_pars)
     n = length(x)
     ψ0 = calc_ψ0(x,α)
 
@@ -55,8 +56,8 @@ function postmean0_simulation(x,IT, mh_step, α, p0, method, config_init,extra_p
 
     # MH algorithm by Neal
     for it in 2:IT
-      configs[it] = update_config(configs[it-1],n,x, ψ0,method)
-      configs[it], sum_acc = update_θ(configs[it],x,mh_step,sum_acc,method,extra_pars)
+      configs[it] = updateconfig(configs[it-1],n,x, ψ0,method)
+      configs[it], sum_acc = updateθ(configs[it],x,std_mhstep,sum_acc,method,extra_pars)
       postmean_atzero[it] = (p0 + dot(configs[it].counts,ψ(0).(configs[it].θ)))/(α+n)
     end
 
@@ -85,7 +86,7 @@ function calc_ψ0(x,α)
   α * [quadgk(Ψ(x[i]), x[i], Inf)[1] for i in eachindex(x)]
 end
 
-function update_config(config,n,x,ψ0,method,extra_pars)
+function updateconfig(config,n,x,ψ0,method,extra_pars)
     configN = deepcopy(config)
     for i in 1:n # loop over all labels
         # find table of the i-th customer
@@ -138,14 +139,14 @@ function update_config(config,n,x,ψ0,method,extra_pars)
 end
 
 
-function update_θ(config,x,mh_step,sum_acc,method,extra_pars)
+function updateθ!(config,sum_acc,x,std_mhstep,method,extra_pars)
     for k in 1:config.n_tables
         #ind =find(isequal(config.tableIDs[k]),config.labels)  # OLD find observation indices in table keys
         ind = findall(x->x==config.tableIDs[k], config.labels)[1] # new dec 2019
-        config.θ[k], acc =sample_θ(config.θ[k], x[ind],mh_step,method,extra_pars)
+        config.θ[k], acc = sampleθ(config.θ[k], x[ind],std_mhstep,method,extra_pars)
         sum_acc += acc
     end
-    config, sum_acc
+    #config, sum_acc
 end
 
 logtarget(θ,x) = log(base_density(θ)) - length(x) * log(θ)
@@ -158,6 +159,8 @@ logtarget(θ,x) = log(base_density(θ)) - length(x) * log(θ)
 
 """
     Get one (independent) realisation for θ, assuming x is a float
+
+    i suspect this is just a sample from the prior on θ
 """
 function sample_θ1(x,method,extra_pars)
     if method=="A"
@@ -181,18 +184,18 @@ end
 """
     Draw from the posterior, given observations in x
 """
-function sample_θ(θold,x,mh_step,method,extra_pars)
+function sampleθ(θold,x,std_mhstep,method,extra_pars)
     if method in ["C","D"]
         acc = 1
         out = rand(Pareto(length(x)+extra_pars[1],maximum([x;extra_pars[2]])))
     else
-        θ = θold + mh_step * randn()
+        θ = θold + std_mhstep * randn()
         xmax = maximum(x)
         acc = 0
         if θ < xmax # reject right-away θs out of the support of the target density
            out = θold
         else
-           a = logtarget(θ,x) - logtarget(θold,x) - logccdf(Normal(θ,mh_step),xmax) + logccdf(Normal(θold,mh_step),xmax)
+           a = logtarget(θ,x) - logtarget(θold,x) - logccdf(Normal(θ,std_mhstep),xmax) + logccdf(Normal(θold,std_mhstep),xmax)
            if log(rand()) < a
                out = θ
                acc = 1
@@ -207,7 +210,76 @@ end
 """
     sample once from Ga(shape=α, rate=β)-distribution, truncated to be less than thresh
 """
-function rand_trunc_gamma(α,β,thresh)
+function randtruncgamma(α,β,thresh)
     y = cdf(Gamma(α,1/β),thresh) * rand()
     quantile(Gamma(α,1/β),y)
+end
+
+
+function priorconstants(grid, x, α)
+    lg = length(grid)
+    ρ = zeros(lg)
+    ρ[lg] = α * quadgk(Ψ(grid[lg]), grid[lg], Inf)[1]
+    for k in lg:-1:2
+        ρ[k-1] = ρ[k] + α * quadgk(Ψ(grid[k-1]), grid[k-1], grid[k])[1]
+    end
+    ψ0 = calc_ψ0(x,α)
+    ρ, ψ0
+end
+
+
+"""
+    Do mcmc algorithm of Neal
+
+    postτ, postmean, mean_acc = mcmc(IT, grid, method)
+
+    x: data
+    α: concentration parameter for Dirichlet process
+    IT: number of iterations is then IT-1
+
+    first row of postmean contains the grid on which we compute the posterior mean
+"""
+function mcmc(x, method, α, IT, std_mhstep, grid)
+    base_density, base_measure, extra_pars = setprior(method)
+    # compute prior constants
+    ρ, ψ0 = priorconstants(grid, x, α)
+    n = length(x)
+
+    # initialisation of the configuration (simply take one cluster)
+    config_init = Config(ones(n),[1], [n],1,[maximum(x)+1])
+    configs = [deepcopy(config_init) for j in 1:IT]  #Array{Config}(IT)
+
+    postmean = zeros(IT,length(grid))
+    postτ = ones(IT) # only relevant with mixture of Pareto base measure
+    postτ[1] = 10.0
+
+    md = method=="D"
+
+    if md
+        αα, λ, β = extra_pars[3], extra_pars[4], extra_pars[5]
+        extrapars[2] = postτ[1]
+    end
+
+    # MH algorithm by Neal
+    sum_acc = 0
+    for it in 2:IT
+        configs[it] = updateconfig(configs[it-1],n,x, ψ0,method,extra_pars)
+        updateθ!(configs[it],sum_acc,x,std_mhstep,method,extra_pars)
+        if md
+            postτ[it] = randtruncgamma(λ + configs[it].n_tables * αα, β, minimum(configs[it].θ))
+            extra_pars[2] = postτ[it]
+        end
+
+        if it%100==0   println(it) end
+
+        postmean[it,:] = [(p[k] + dot(configs[it].counts,ψ(grid[k]).(configs[it].θ)))/(α+n) for k in eachindex(grid)]
+    end
+
+    # compute average acc prob for mh updates for theta
+    nθupdates = sum([configs[it].n_tables for it in 2:IT])
+    mean_acc = sum_acc/nθupdates
+
+    println("Average acceptance rate on updating θ: ", round(mean_acc;digits=3))
+    postmean[1,:] = grid
+    postτ, postmean, mean_acc, extra_pars
 end

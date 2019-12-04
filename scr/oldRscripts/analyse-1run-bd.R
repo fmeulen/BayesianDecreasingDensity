@@ -1,4 +1,6 @@
-setwd("~/Sync/DOCUMENTS/onderzoek/LiXue/bayesdec_julia/methodA")
+# get directory of source script
+setwd(dirname(rstudioapi::getSourceEditorContext()$path))
+
 
 library(plyr)
 library(ggplot2)
