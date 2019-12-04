@@ -1,7 +1,7 @@
 cd("/Users/Frank/Sync/DOCUMENTS/onderzoek/LiXue/bayesdec_julia")
 using Distributions
 #using Plots
-include("bd_funcdefs.jl")
+include("bd_funcdefs.jl") 
 #srand(1112)
 
 # At each iteration I keep track of the configuration, for that I define the
