@@ -1,7 +1,14 @@
-cd("/Users/Frank/Sync/DOCUMENTS/onderzoek/LiXue/bayesdec_julia")
 using Distributions
+using CSV
+using QuadGK
+
+workdir = @__DIR__
+println(workdir)
+cd(workdir)
+
+
 #using Plots
-include("bd_funcdefs.jl") 
+include("bd_funcdefs.jl")
 #srand(1112)
 
 # At each iteration I keep track of the configuration, for that I define the
@@ -23,7 +30,7 @@ if method=="A"
     extra_pars = 0 # no extra pars
   end
 if method=="B"
-  base_measure = Gamma(2,1)
+  base_measure = Gamma(2.0,1.0)
   base_density(θ) = pdf(base_measure,θ)
   extra_pars = 0 # no extra pars
 end
@@ -45,16 +52,13 @@ if method=="D"
     base_density(θ) = pdf(base_measure,θ)
 end
 
-
-
 # specify simulation settings
 mh_step = 0.4 # sd for mh step updating θ
 IT = 50000
 
 # read data
-X = readcsv("curdur.csv")
-y = X[2:end,2]
-x= sort(y)[1:618]
+y = readdlm("curdur.csv",',', header=true)[1][:,2]
+x = sort(y)[1:618]
 
 # sample of size 100 from Exp(1) distribution
 #x =readcsv("exp100.csv")[2:end,2]
@@ -62,15 +66,14 @@ x= sort(y)[1:618]
 n = length(x)
 
 #grid = linspace(0,maximum(x)+1,50)  # compute estimates on this grid
-grid = linspace(0,36,300)
+grid = range(0,36;length=300)#linspace(0,36,300)
 
 #grid = [linspace(0,0.01,11);linspace(0.05,5,100)]  # for exp100
 
 # initialisation of the configuration (simply take one cluster)
-configs = Array{Config}(IT)
-configs[1] = Config(ones(n),[1], [n],1,[maximum(x)+1])
+config1 = Config(ones(n),[1], [n],1,[maximum(x)+1])
+configs = [deepcopy(config1) for j in 1:IT]  #Array{Config}(IT)
 
-tic()
 
 # compute prior constants
 lg = length(grid)
