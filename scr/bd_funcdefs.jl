@@ -49,33 +49,6 @@ function setprior(method)
     base_density,  ep
 end
 
-function postmean0_simulation(x,IT, std_mhstep, α, p0, method, config_init,ep)
-    n = length(x)
-    ψ0 = compψ0(x,α)
-
-    # initialisation of the configuration (simply take one cluster)
-    configs = Array{Config}(IT)
-    configs[1] = config_init
-
-    sum_acc = 0
-    postmean_atzero = zeros(IT)
-
-    # MH algorithm by Neal
-    for it in 2:IT
-      configs[it] = updateconfig(configs[it-1],x, ψ0,method)
-      configs[it], sum_acc = updateθ(configs[it],x,std_mhstep,sum_acc,method,ep)
-      postmean_atzero[it] = (p0 + dot(configs[it].counts,ψ(0).(configs[it].θ)))/(α+n)
-    end
-
-    # compute average acc prob for mh updates for theta
-    nθupdates = 0
-    for it in 2:IT
-      nθupdates += configs[it].n_tables
-    end
-
-    postmean_atzero, sum_acc/nθupdates, configs[IT]
-end
-
 
 
 #-------------------------- define uniform density --------------------------
@@ -255,16 +228,20 @@ end
             (3) iteratenr
         mean_acc: average acceptance rate on MH-step for θ
         ep: extra parameters (only relevant if method==D)
+        final configuration
 
 """
-function mcmc(x, method, α, IT, std_mhstep, grid; p=0.05, BI=div(IT,2))
+function mcmc(x, method, α, IT, std_mhstep, grid;
+                p=0.05, BI=div(IT,2),
+                config_init=Config(ones(n),[1], [n],1,[maximum(x)+1]) )
+
     base_density, ep = setprior(method)
     # compute prior constants
     ρ, ψ0 = priorconstants(grid, x, α, base_density)
     n = length(x)
 
     # initialisation of the configuration (simply take one cluster)
-    config_init = Config(ones(n),[1], [n],1,[maximum(x)+1])
+    #config_init = Config(ones(n),[1], [n],1,[maximum(x)+1])
     configs = [deepcopy(config_init) for j in 1:IT]  #Array{Config}(IT)
 
     postmean = zeros(IT,length(grid))
@@ -303,8 +280,39 @@ function mcmc(x, method, α, IT, std_mhstep, grid; p=0.05, BI=div(IT,2))
     println("Average acceptance rate on updating θ: ", round(mean_acc;digits=3))
 
     iterates = DataFrame(posttau=postτ, postmean0=postmean[:,1],iteratenr=1:IT)
-    dout, iterates, mean_acc, ep
+    (dout=dout, iterates=iterates, mean_acc=mean_acc, ep=ep, config_end=configs[end])
 end
+
+
+#------------------------------- script for rate comparison at zero --------------------------
+# probably obsolete
+function postmean0_simulation(x,IT, std_mhstep, α, p0, method, config_init,ep)
+    n = length(x)
+    ψ0 = compψ0(x,α)
+
+    # initialisation of the configuration (simply take one cluster)
+    configs = Array{Config}(IT)
+    configs[1] = Config(ones(n),[1], [n],1,[maximum(x)+1])
+
+    sum_acc = 0
+    postmean_atzero = zeros(IT)
+
+    # MH algorithm by Neal
+    for it in 2:IT
+      configs[it] = updateconfig(configs[it-1],x, ψ0,method)
+      configs[it], sum_acc = updateθ(configs[it],x,std_mhstep,sum_acc,method,ep)
+      postmean_atzero[it] = (α*p0 + dot(configs[it].counts,ψ(0).(configs[it].θ)))/(α+n)
+    end
+
+    # compute average acc prob for mh updates for theta
+    nθupdates = 0
+    for it in 2:IT
+      nθupdates += configs[it].n_tables
+    end
+
+    postmean_atzero, sum_acc/nθupdates, configs[IT]
+end
+
 
 
     ### debugging  example
