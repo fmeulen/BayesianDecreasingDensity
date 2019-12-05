@@ -10,13 +10,40 @@ library(tidyverse)
 library(latex2exp)
 library(fdrtool) # for Grenander estimator
 
-d_init <- read_csv("out/postmean.csv",  col_names = FALSE)
+d_init <- read_csv("out/postsummary.csv")
+grid = d_init$x
+true <- data.frame(x=grid,y=dexp(grid))
+iterates <- read_csv("out/iterates.csv") %>% gather(key="variable", value="value", posttau, postmean0)
+
+
+iterates %>% ggplot(aes(x=iteratenr,y=value)) + geom_path() + facet_wrap(~variable, scales='free')
+iterates %>% ggplot(aes(x=value)) + geom_histogram(fill='white',colour='black') + facet_wrap(~variable, scales='free')
+
+#titel=TeX("$g(\\theta) \\propto exp(- \\theta - 1 / \\theta)$")
+#titel <- "Gamma(2,1)"
+#titel <- "Pareto(1,0.5)"
+#titel <- "Pareto(1,0.05)"
+#titel <- "Pareto(1,0.005)"
+titel <- TeX("Mixture Pareto(1,$\\tau$)")
+
+p <- d_init %>% ggplot() +  geom_ribbon(aes(x=x,ymin = lower, ymax = upper), fill = "grey80") +
+  geom_line(aes(x=x,y=ave)) +ggtitle(titel)+coord_cartesian(xlim = c(0, 5),ylim=c(0,1.1))+
+  geom_line(data=true,aes(x=x,y=y),colour='brown2',size=1.2,linetype='dashed')+
+  xlab("")+ ylab("")+
+  theme(plot.title = element_text(hjust = 0.5))+scale_y_continuous(breaks=seq(0,1.1,by=0.2))
+p
+
+pdf('postmean.pdf',width=3.5,height=2.5)
+  show(p)
+dev.off()
+
+
 
 #d_init <- read_csv("./methodA/postmean.csv",col_names = FALSE)
 #d_init <- read_csv("./methodB/postmean.csv",col_names = FALSE)
 #d_init <- read_csv("./methodC-tau0-5/postmean.csv",col_names = FALSE)
 #d_init <- read_csv("./methodC-tau0-05/postmean.csv",col_names = FALSE)
-d_init <- read_csv("./methodC-tau0-005/postmean.csv",col_names = FALSE)
+#d_init <- read_csv("./methodC-tau0-005/postmean.csv",col_names = FALSE)
 #d_init <- read_csv("./methodD/postmean.csv",col_names = FALSE)
 #d_init <- read_csv("./methodDtest/postmean.csv",col_names = FALSE)
 
@@ -24,49 +51,13 @@ d_init <- read_csv("./methodC-tau0-005/postmean.csv",col_names = FALSE)
 # rows correspond to iterations
 # first row is the grid
 
-d <- d_init[-1,]
-grid <- as.numeric(d_init[1,])
-
-# trace plots at two locations
-d %>% mutate(iterate=1:nrow(d)) %>% ggplot() + geom_line(aes(x=iterate,y=X1))
-d %>% mutate(iterate=1:nrow(d)) %>% ggplot() + geom_line(aes(x=iterate,y=X40))
-
-# density plot
-BI <- round(nrow(d_init)/2,0)
-dminBI <- d_init[-(1:BI),]
-dmean = apply(dminBI,2,mean)
-dquantl <- apply(dminBI,2,quantile,probs=0.025)
-dquantu <- apply(dminBI,2,quantile,probs=0.975)
-
-res <- data.frame(x=grid,m=dmean,ql=dquantl,qu=dquantu)
-
-true <- data.frame(x=grid,y=dexp(grid))
-
-#titel=TeX("$g(\\theta) \\propto exp(- \\theta - 1 / \\theta)$")
-#titel <- "Gamma(2,1)"
-#titel <- "Pareto(1,0.5)"
-#titel <- "Pareto(1,0.05)"
-titel <- "Pareto(1,0.005)"
-#titel <- TeX("Mixture Pareto(1,$\\tau$)")
-
-pdf('postmean.pdf',width=3.5,height=2.5)
-res %>% ggplot() +  geom_ribbon(aes(x=x,ymin = ql, ymax = qu), fill = "grey80") +
-  geom_line(aes(x=x,y=m)) +ggtitle(titel)+coord_cartesian(xlim = c(0, 5),ylim=c(0,1.1))+
- geom_line(data=true,aes(x=x,y=y),colour='brown2',size=1.2,linetype='dashed')+
-  xlab("")+ ylab("")+
-  theme(plot.title = element_text(hjust = 0.5))+scale_y_continuous(breaks=seq(0,1.1,by=0.2))
-dev.off()
-
-# trace plot for tau (only interesting with mixture of Pareto (=method D))
-post_tau <- read_csv("out/post_tau.csv", col_names = FALSE)
-post_tau %>% mutate(iterate=1:nrow(post_tau)) %>% ggplot() + 
-  geom_line(aes(x=iterate,y=X1)) + ylab(expression(tau))
 
 
-post_tau_minBI <- post_tau[-(1:BI),]
 
-post_tau_minBI %>% ggplot() + 
-  geom_histogram(aes(x=X1),bins=50,fill='white',colour='black')
+
+
+
+
 
 
 pareto_small <- FALSE

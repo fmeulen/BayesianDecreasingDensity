@@ -3,6 +3,7 @@ using DelimitedFiles
 using QuadGK
 using LinearAlgebra
 using CSV
+using DataFrames
 
 workdir = @__DIR__
 println(workdir)
@@ -10,15 +11,15 @@ cd(workdir)
 
 include("bd_funcdefs.jl")
 
-######## specify the prior
+#------------------ specify the prior ------------------
 α = 1.0                       # concentration par
 method = "A"
 
 # specify simulation settings
-std_mhstep = 0.4 # sd for mh step updating θ
-IT = 10000
+std_mhstep = 0.2 # sd for mh step updating θ
+IT = 25_000
 
-# read data
+#------------------  read data ------------------
 dataset = ["curdur", "exp100"][2]
 if dataset=="curdur"
     y = readdlm("curdur.csv",',', header=true)[1][:,2]
@@ -29,15 +30,15 @@ elseif dataset=="exp100"
     grid = range(0,5;length=100)
 end
 
-
-# mcmc by Neal
+#------------------ mcmc by Neal ------------------
 start = time()
-    postτ, postmean, mean_acc, extra_pars =  mcmc(x, method, α, IT, std_mhstep, grid)
+    dout, iterates, mean_acc, ep = mcmc(x, method, α, IT, std_mhstep, grid)
 elapsedtime = time() - start
 
+#------------------ postprocessing ------------------
 # write results to csv file
-writedlm("./out/postmean.csv",postmean,',')
-writedlm("./out/post_tau.csv",postτ,',')
+CSV.write("./out/postsummary.csv",dout)
+CSV.write("./out/iterates.csv",iterates)
 
 # save info to file
 facc = open("./out/info.txt","w")
@@ -48,5 +49,5 @@ write(facc, "elapsed time ",string(elapsedtime), "\n\n")
 write(facc, "---- Prior specification ----","\n")
 write(facc, "method: ", string(method),"\n")
 write(facc, "concentration parameter: ", string(α),"\n")
-write(facc, "extra_pars= ",string(extra_pars),"\n")
+write(facc, "extra_pars= ",string(ep),"\n")
 close(facc)
