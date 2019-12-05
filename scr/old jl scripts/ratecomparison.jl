@@ -1,31 +1,18 @@
-cd("/Users/Frank/Sync/DOCUMENTS/onderzoek/LiXue/bayesdec_julia")
 using Distributions
-using Plots
-include("bd_funcdefs.jl")
-#srand(1112)
+using DelimitedFiles
+using QuadGK
+using LinearAlgebra
+using CSV
+using DataFrames
 
+workdir = @__DIR__
+println(workdir)
+cd(workdir)
+
+include("bd_funcdefs.jl")
 # At each iteration I keep track of the configuration, for that I define the
 # following data-structure
 
-mutable struct Config
-    labels::Vector{Int64}  #(z_1,...,z_n)
-    tableIDs::Vector{Int64} # table indices
-    counts::Vector{Int64} # table counts
-    n_tables::Int64 # nr of tables
-    θ::Vector{Float64}  # parameters
-end
-
-# specify the prior
-α = 1 # concentration par 
-method = "A"  # set of B for Gamma(2,1) base measure, set to A for e^{-1/θ-θ} type base measure
-if method=="B"
-  base_measure = Gamma(2,1)
-  base_density(θ) = pdf(base_measure,θ)
-end
-
-if method=="A"
-  base_density = (θ) -> exp(-1/θ-θ) * (θ>0) / 0.27973176363304486
-end
 
 # specify simulation settings
 mh_step = 0.06 # sd for mh step updating θ
