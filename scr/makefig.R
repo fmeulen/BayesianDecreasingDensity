@@ -37,6 +37,8 @@ pdf('postmean.pdf',width=3.5,height=2.5)
   show(p)
 dev.off()
 
+f0post100 <- read_csv("out/f0post100.csv")
+f0post100 %>% ggplot() + geom_histogram(aes(x=f0post), fill="white",colour="black")
 
 
 #d_init <- read_csv("./methodA/postmean.csv",col_names = FALSE)

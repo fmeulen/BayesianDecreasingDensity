@@ -284,6 +284,17 @@ function mcmc(x, method, α, IT, std_mhstep, grid;
 end
 
 
+
+function simdata(n, truedistribution)
+    if truedistribution =="HalfNormal"
+        x= abs.(randn(n))
+    elseif truedistribution=="Exponential(1)"
+        x = rand(Exponential(1.0),n)
+    else
+        @error "Incorrect specification of truedistribution."
+    end
+end
+
 #------------------------------- script for rate comparison at zero --------------------------
 # probably obsolete
 function postmean0_simulation(x,IT, std_mhstep, α, p0, method, config_init,ep)

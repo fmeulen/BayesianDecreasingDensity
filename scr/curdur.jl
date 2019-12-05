@@ -60,17 +60,16 @@ if ratecomparison
     NSIM = 50 # 100
 
     # specify data generation
-    true_distribution = Exponential(1)
-    n= 100
+    n = 100
+    truedistribution = ["Exponential(1)", "HalfNormal"][1]
 
-    # do the simulations
     f0post = zeros(NSIM)
     mean_acc = zeros(NSIM)
-#    ρ0 =  quadgk(Ψ(0, base_density), 0, Inf)[1]
+
     grid0 =[0.0]
+
     # do one preliminary run to obtain initial configuration
-    #x = rand(true_distribution,n)
-    x = abs.(randn(n))  # half normal distr
+    x = simdata(n, truedistribution)
     outprelim = mcmc(x, method, α, IT, std_mhstep, grid0)
     println(outprelim.mean_acc)
 
@@ -79,14 +78,12 @@ if ratecomparison
     println("Start Monte-Carlo study")
     for k in 1:NSIM
       print(k)
-      #x = rand(true_distribution,n)
-      x = abs.(randn(n))
+      x = simdata(n, truedistribution)
       sim = mcmc(x, method, α, IT, std_mhstep, grid0, config_init=cpre)
-      f0post[it] = sim.dout.ave[1]
+      f0post[k], mean_acc[k] = sim.dout.ave[1], sim.mean_acc
     end
 
-
     # write results to csv file
-    CSV.write("f0post$n.csv",f0_post)
+    CSV.write("./out/f0post$n.csv",DataFrame(f0post=f0post))
 end
 elapsedtime = time() - start
