@@ -15,6 +15,8 @@ mutable struct ExtraPar
 end
 
 
+makeconfig_init(x) = Config(ones(length(x)),[1], [length(x)],1,[maximum(x)+1])
+
 #-------------------------- set prior --------------------------
 """
     Set the prior used in Bayesian estimation of a decreasing density
@@ -30,14 +32,20 @@ function setprior(method)
         base_measure = Gamma(2.0,1.0)
         base_density = (θ) -> pdf(base_measure,θ)
         ep = ExtraPar(0.0, 0.0, 0.0, 0.0) # no extra pars
-    elseif method=="C"
+    elseif method in ["C", "D", "E"]
         αα = 1.0
-        τ = 0.005
+        if method=="C"
+            τ = 0.5
+        elseif method=="D"
+            τ = 0.05
+        elseif method=="E"
+            τ = 0.005
+        end
         ep = ExtraPar(αα, 0.0, 0.0,τ) # no extra pars
         base_measure = Pareto(αα,τ) # second argument is the support parameter
         base_density = (θ) ->  pdf(base_measure,θ)
-    elseif method=="D"
-    # add mixture of Pareto # prior on τ (which is the Pareto threshold) is assumed Ga(λ,β)
+    elseif method=="F"
+        # add mixture of Pareto # prior on τ (which is the Pareto threshold) is assumed Ga(λ,β)
         αα = 1.0
         λ = 2.0
         β = 1.0
@@ -147,7 +155,7 @@ function sampleθnewtable(x,method,ep)
         end
     elseif method=="B"
         out = x - log(rand())
-    elseif method in ["C","D"]
+    elseif method in ["C","D","E","F"]
         out = rand(Pareto(1 + ep.αα,max(ep.τ,x)))
     end
     out
@@ -231,9 +239,7 @@ end
         final configuration
 
 """
-function mcmc(x, method, α, IT, std_mhstep, grid;
-                p=0.05, BI=div(IT,2),
-                config_init=Config(ones(n),[1], [n],1,[maximum(x)+1]) )
+function mcmc(x, method, α, IT, std_mhstep, grid; p=0.05, BI=div(IT,2), config_init=makeconfig_init(x))
 
     base_density, ep = setprior(method)
     # compute prior constants

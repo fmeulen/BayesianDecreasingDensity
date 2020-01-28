@@ -1,0 +1,10 @@
+Average acceptance probability equals: 0.182
+Number of iterations: 250
+std_mhstep = 0.7
+
+elapsed time 0.19390416145324707
+
+---- Prior specification ----
+method: E
+concentration parameter: 1.0
+extra_pars= ExtraPar(1.0, 0.0, 0.0, 0.005)
