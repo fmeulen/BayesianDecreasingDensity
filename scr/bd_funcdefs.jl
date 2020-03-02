@@ -48,16 +48,15 @@ function setprior(method)
         elseif method=="E"
             τ = 0.005
         end
-        ep = ExtraPar(αα, 0.0, 0.0,τ) # no extra pars
+        ep = ExtraPar(αα, 0.0, 0.0,τ)
         base_measure = Pareto(αα,τ) # second argument is the support parameter
         base_density = (θ) ->  pdf(base_measure,θ)
-    elseif method=="F"
-        # add mixture of Pareto # prior on τ (which is the Pareto threshold) is assumed Ga(λ,β)
+    elseif method=="F" # mixture of Pareto with prior on τ (which is the Pareto threshold) is assumed Ga(λ,β)
         αα = 1.0
         λ = 2.0
         β = 1.0
         τ = 0.1
-        ep = ExtraPar(αα, λ, β, τ) # no extra pars
+        ep = ExtraPar(αα, λ, β, τ)
         base_measure = Pareto(αα,τ) # second argument is the support parameter
         base_density = (θ) ->  pdf(base_measure,θ)
     end
