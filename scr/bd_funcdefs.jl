@@ -1,3 +1,10 @@
+struct HalfNormal end
+import Distributions.pdf
+import Distributions.rand
+pdf(::HalfNormal, x) = 2.0*pdf(Normal(),x)
+rand(::HalfNormal,n::Integer) = abs.(randn(n))
+
+
 # Keep track of the configuration at each iteration using Config
 mutable struct Config
     labels::Vector{Int64}               # (z_1,...,z_n)
@@ -239,7 +246,7 @@ end
         final configuration
 
 """
-function mcmc(x, method, α, IT, std_mhstep, grid; p=0.05, BI=div(IT,2), config_init=makeconfig_init(x))
+function mcmc(x, method, α, IT, std_mhstep, grid; p=0.05, BI=div(IT,2), config_init=makeconfig_init(x),printoutput=false)
 
     base_density, ep = setprior(method)
     # compute prior constants
@@ -267,7 +274,7 @@ function mcmc(x, method, α, IT, std_mhstep, grid; p=0.05, BI=div(IT,2), config_
             ep.τ = postτ[it]
         end
 
-        if it%250==0   println(it) end
+        #if it%1000==0   println(it) end
 
         conf = configs[it]
         postmean[it,:] = [(α*ρ[k] + dot(conf.counts, ψ(grid[k]).(conf.θ)))/(α + n) for k in eachindex(grid)]
@@ -283,7 +290,7 @@ function mcmc(x, method, α, IT, std_mhstep, grid; p=0.05, BI=div(IT,2), config_
     lower = vec(mapslices(v-> quantile(v,  p/2), postmean_BI; dims= 1))
     dout = DataFrame(lower=lower,upper=upper, ave=ave,x=grid)
 
-    println("Average acceptance rate on updating θ: ", round(mean_acc;digits=3))
+    if printoutput    println("Average acceptance rate on updating θ: ", round(mean_acc;digits=3))  end
 
     iterates = DataFrame(posttau=postτ, postmean0=postmean[:,1],iteratenr=1:IT)
     (dout=dout, iterates=iterates, mean_acc=mean_acc, ep=ep, config_end=configs[end])

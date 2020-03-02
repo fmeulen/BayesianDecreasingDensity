@@ -7,7 +7,6 @@ using DataFrames
 using RCall
 
 R"""
-    library(plyr)
     library(ggplot2)
     library(ggthemes)
     library(scales)
@@ -22,7 +21,7 @@ workdir = @__DIR__
 include("bd_funcdefs.jl")
 
 # make directory for figures
-figdir = workdir*"/out/fig/"
+figdir = workdir*"/out/exp1/"
 mkpath(figdir)
 
 #------------------ specify the prior ------------------
@@ -32,25 +31,27 @@ datasets = ["curdur", "exp100", "halfnormal100"]
 methods = ["A", "B", "C", "D", "E", "F"]
 
 # specify simulation settings
-std_mhstep = 0.7 # sd for mh step updating θ
-IT = 250#25_000
+std_mhstep = 0.4 # sd for mh step updating θ
+IT = 25_000
+
 
 #------------------  read data ------------------
 for dataset in datasets[[2,3]], method in methods
     println(dataset)
     println(method)
     println("----")
-
-
     if dataset=="curdur"
-        y = readdlm("datasets/curdur.csv",',', header=true)[1][:,2]
+        fn = joinpath(workdir, "datasets/curdur.csv")
+        y = readdlm(fn,',', header=true)[1][:,2]
         x = sort(y)[1:618]
         grid = range(0,36;length=300)
     elseif dataset=="exp100"
-        x = readdlm("datasets/exp100.csv",',',header=true)[1][:,2]#[2:end,2]
+        fn = joinpath(workdir, "datasets/exp100.csv")
+        x = readdlm(fn,',',header=true)[1][:,2]#[2:end,2]
         grid = range(0,5;length=100)
     elseif dataset=="halfnormal100"
-        x = vec(readdlm("datasets/halfnormal100.csv",','))
+        fn = joinpath(workdir, "datasets/halfnormal100.csv")
+        x = vec(readdlm(fn,','))
         grid = range(0,5;length=100)
     end
 
@@ -60,13 +61,11 @@ for dataset in datasets[[2,3]], method in methods
     elapsedtime = time() - start
 
     #------------------ postprocessing ------------------
-    outdir =  workdir*"/out/"*dataset*"_"*method*"/"
+    outdir =  workdir*"/out/exp1/"*dataset*"_"*method*"/"
     mkpath(outdir)
-
     # write results to csv file
     CSV.write(outdir*"postsummary.csv",out.dout)
     CSV.write(outdir*"iterates.csv",out.iterates)
-
     # save info to file
     facc = open(outdir*"info.txt","w")
     write(facc, "Average acceptance probability equals: ",string(round(out.mean_acc;digits=3)),"\n")
@@ -78,14 +77,17 @@ for dataset in datasets[[2,3]], method in methods
     write(facc, "concentration parameter: ", string(α),"\n")
     write(facc, "extra_pars= ",string(out.ep),"\n")
     close(facc)
-
+    # plotting
     d = out.dout
     if dataset=="curdur"
         newcol= 0.0 * d[:x]   # adjust later, true density is unknown
+        ymax = 0.5  # check if reasonable
     elseif dataset=="exp100"
         newcol = pdf(Exponential(),d[:x])
+        ymax = 1.2
     elseif dataset=="halfnormal100"
         newcol = 2.0*pdf(Normal(),d[:x])
+        ymax = 1.0
     end
     insertcols!(d, 5, :truedens => newcol) # add true val of density
 
@@ -96,6 +98,7 @@ for dataset in datasets[[2,3]], method in methods
     @rput d # dataframe with estimates
     @rput method
     @rput x # the data
+    @rput ymax # max value on y-axis
     R"""
         if (method=="A")
                 {titel=TeX("$g(\\theta) \\propto exp(- \\theta - 1 / \\theta)$")}
@@ -111,7 +114,8 @@ for dataset in datasets[[2,3]], method in methods
             {titel <- TeX("Mixture Pareto(1,$\\tau$)")}
 
         p <- d %>% ggplot() +  geom_ribbon(aes(x=x,ymin = lower, ymax = upper), fill = "grey80") +
-            geom_line(aes(x=x,y=ave)) +ggtitle(titel)+coord_cartesian(xlim = c(0, 5),ylim=c(0,1.1))+
+            geom_line(aes(x=x,y=ave)) +ggtitle(titel)+
+            coord_cartesian(xlim = c(0, 5),ylim=c(0,ymax))+
             geom_line(aes(x=x,y=truedens),colour='brown2',size=1.2,linetype='dashed')+
             xlab("")+ ylab("")+
             theme(plot.title = element_text(hjust = 0.5))#+scale_y_continuous(breaks=seq(0,1.1,by=0.2))
@@ -127,6 +131,4 @@ for dataset in datasets[[2,3]], method in methods
         dev.off()
 
     """
-
-
 end
