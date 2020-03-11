@@ -21,9 +21,7 @@ mutable struct ExtraPar
     τ::Float64
 end
 
-
 makeconfig_init(x) = Config(ones(length(x)),[1], [length(x)],1,[maximum(x)+1])
-
 #-------------------------- set prior --------------------------
 """
     Set the prior used in Bayesian estimation of a decreasing density
@@ -101,30 +99,32 @@ end
 
 #-------------------------- update labels --------------------------
 function updateconfig(config, x, ψ0, method, ep)
-    configN = deepcopy(config)
+    #configN = deepcopy(config)
+    configN = config
     for i in eachindex(x) # loop over all labels
         # find tableID of the i-th customer
-        #ind = find(isequal(configN.labels[i]),configN.tableIDs) # old
-        ind = findall(x->x==configN.labels[i], configN.tableIDs)[1] # new dec 2019
-        # remove i-th customer from the table counts
-        configN.counts[ind] += -1
-        a = configN.counts[ind]
+        #ind = findall(x -> x==configN.labels[i], configN.tableIDs)[1] # new dec 2019 #ind = find(isequal(configN.labels[i]),configN.tableIDs) # old
+        ind = findfirst(x -> x==configN.labels[i], configN.tableIDs)
 
-      # check for empty tables as a result of replacing the i-th label
-      # in that case: remove the table from tableIDs, counts and θ, and reduce n_tables by one
-        if a[1]==0  #true if removing customer i results in an empty table
-            deleteat!(configN.counts, ind) # remove counts of table
-            deleteat!(configN.tableIDs,ind) # remove table
-            deleteat!(configN.θ,ind) # remove element ind from vector of θs
-            configN.n_tables += -1
+        # remove i-th customer from the table counts
+        configN.counts[ind] -= 1
+        a =
+
+        # check for empty tables as a result of replacing the i-th label
+        # in that case: remove the table from tableIDs, counts and θ, and reduce n_tables by one
+        if configN.counts[ind][1]==0  # ==true if removing customer i results in an empty table
+            deleteat!(configN.counts, ind) # remove table from counts vector
+            deleteat!(configN.tableIDs,ind) # remove table from tableID vector
+            deleteat!(configN.θ,ind) # remove table from θvalues vector
+            configN.n_tables += -1   # decrease total number of tables
         end
 
         w =[ψ(x[i],configN.θ[j]) * configN.counts[j] for j in 1:configN.n_tables]
-        append!(w,ψ0[i]) # append for opening a new table
+        append!(w, ψ0[i]) # append for opening a new table
 
-        # choose new table for customer i
+        # sample new table for customer i proportional to w[i]
+        ind = rand(Categorical(w/sum(w)))
         id_new = maximum(configN.tableIDs) + 1 # the label assigned, in case a new table is to be chosen
-        ind = rand(Categorical(w/sum(w))) # index for chosen table
         newtable = [configN.tableIDs;id_new][ind]
 
         # add customer i back in, on its new table
@@ -309,41 +309,42 @@ end
 
 #------------------------------- script for rate comparison at zero --------------------------
 # probably obsolete
-function postmean0_simulation(x,IT, std_mhstep, α, p0, method, config_init,ep)
-    n = length(x)
-    ψ0 = compψ0(x,α)
-
-    # initialisation of the configuration (simply take one cluster)
-    configs = Array{Config}(IT)
-    configs[1] = Config(ones(n),[1], [n],1,[maximum(x)+1])
-
-    sum_acc = 0
-    postmean_atzero = zeros(IT)
-
-    # MH algorithm by Neal
-    for it in 2:IT
-      configs[it] = updateconfig(configs[it-1],x, ψ0,method)
-      configs[it], sum_acc = updateθ(configs[it],x,std_mhstep,sum_acc,method,ep)
-      postmean_atzero[it] = (α*p0 + dot(configs[it].counts,ψ(0).(configs[it].θ)))/(α+n)
-    end
-
-    # compute average acc prob for mh updates for theta
-    nθupdates = 0
-    for it in 2:IT
-      nθupdates += configs[it].n_tables
-    end
-
-    postmean_atzero, sum_acc/nθupdates, configs[IT]
-end
+# function postmean0_simulation(x,IT, std_mhstep, α, p0, method, config_init,ep)
+#     n = length(x)
+#     ψ0 = compψ0(x,α)
+#
+#     # initialisation of the configuration (simply take one cluster)
+#     configs = Array{Config}(IT)
+#     configs[1] = Config(ones(n),[1], [n],1,[maximum(x)+1])
+#
+#     sum_acc = 0
+#     postmean_atzero = zeros(IT)
+#
+#     # MH algorithm by Neal
+#     for it in 2:IT
+#       configs[it] = updateconfig(configs[it-1],x, ψ0,method)
+#       configs[it], sum_acc = updateθ(configs[it],x,std_mhstep,sum_acc,method,ep)
+#       postmean_atzero[it] = (α*p0 + dot(configs[it].counts,ψ(0).(configs[it].θ)))/(α+n)
+#     end
+#
+#     # compute average acc prob for mh updates for theta
+#     nθupdates = 0
+#     for it in 2:IT
+#       nθupdates += configs[it].n_tables
+#     end
+#
+#     postmean_atzero, sum_acc/nθupdates, configs[IT]
+# end
 
 
 
     ### debugging  example
     if false
 
-        configN = Config([1,2,1,3,1,4],[1,3,4,2],[3,1,1,1],4,[0.1, 0.3, 0.5, 0.7])
-        i=2
-        ind = findall(x->x==configN.labels[i], configN.tableIDs)[1]
+        configN = Config([1,2,1,3,1,5,5],[1,3,5,2],[3,1,2,1],4,[0.1, 0.3, 0.5, 0.7])
+        i=6
+        @time ind = findall(x->x==configN.labels[i], configN.tableIDs)[1]
+        @time ind = findfirst(x->x==configN.labels[i], configN.tableIDs)
 
 
         # labels::Vector{Int64}               # (z_1,...,z_n)

@@ -1,4 +1,4 @@
-# file for reproducing the experiments in section 5.1 of the paper. 
+# file for reproducing the experiments in section 5.1 of the paper.
 
 using Distributions
 using DelimitedFiles
@@ -38,8 +38,8 @@ IT = 25_000
 
 
 #------------------  read data ------------------
-#for dataset in datasets[[2,3]], method in methods
-for dataset in datasets[[4,5]], method in methods
+for dataset in datasets[[2,3]], method in methods
+#for dataset in datasets[[4,5]], method in methods
     println(dataset)
     println(method)
     println("----")

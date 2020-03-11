@@ -90,7 +90,7 @@ end
 res1 = load("./out/ratecomparison/res_ratecomparison"*string(truedistributions[1])*".jld2")["res"]
 res2 = load("./out/ratecomparison/res_ratecomparison"*string(truedistributions[2])*".jld2")["res"]
 res = vcat(res1,res2)
-# combine res1 and res2 res =
+
 
 
 
@@ -102,13 +102,14 @@ df = DataFrame(true_distribution = ec(res,1), n=ec(res,2),
   meanacc=ec(res,5))
 @rput df
 R"""
-p <- df %>% ggplot(aes(x=log10n, y = log10_rmse, colour=method)) + geom_point() +
+p <- df %>%  mutate(method=fct_recode(method, "D" = "F")) %>%
+      ggplot(aes(x=log10n, y = log10_rmse, colour=method)) + geom_point() +
         stat_smooth(method = "lm", se=FALSE) +
-          facet_wrap(~true_distribution, scales='free') +
+          facet_wrap(~true_distribution,scales='free') +
         theme(plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5),legend.position = 'bottom') +
-        xlab(TeX("$\\log_{10}(n)$")) + ylab("RMSE(n)")
-pdf("rate_at0_comparison.pdf",width=7,height=4)
+        xlab(TeX("$\\log_{10}(n)$")) + ylab(TeX("$\\log_{10}(RMSE(n))$"))
+pdf("rate_at0_comparison.pdf",width=7.5,height=3.6)
   show(p)
 dev.off()
 """
@@ -116,37 +117,38 @@ dev.off()
 println("Exponential distribution:")
 @rput df
 R"""
-dfAexp <- df %>% filter(method=="A", true_distribution=="Exp")
+nb <- 1
+dfAexp <- df %>% filter(method=="A", true_distribution=="Exp") %>% filter(n>nb)
 fitA <- lm(log10_rmse ~ log10n, data=dfAexp)
 print(coef(fitA))
 """
 
 R"""
-dfBexp <- df %>% filter(method=="B", true_distribution=="Exp")
+dfBexp <- df %>% filter(method=="B", true_distribution=="Exp")%>% filter(n>nb)
 fitB <- lm(log10_rmse ~ log10n, data=dfBexp)
 print(coef(fitB))
 """
 
 R"""
-dfFexp <- df %>% filter(method=="F", true_distribution=="Exp")
+dfFexp <- df %>% filter(method=="F", true_distribution=="Exp")%>% filter(n>nb)
 fitF <- lm(log10_rmse ~ log10n, data=dfFexp)
 print(coef(fitF))
 """
 println("HalfNormal distribution:")
 R"""
-dfA_HN <- df %>% filter(method=="A", true_distribution=="HalfNormal")
+dfA_HN <- df %>% filter(method=="A", true_distribution=="HalfNormal")%>% filter(n>nb)
 fitA_HN <- lm(log10_rmse ~ log10n, data=dfA_HN)
 print(coef(fitA_HN))
 """
 
 R"""
-dfB_HN <- df %>% filter(method=="B", true_distribution=="HalfNormal")
+dfB_HN <- df %>% filter(method=="B", true_distribution=="HalfNormal")%>% filter(n>nb)
 fitB_HN <- lm(log10_rmse ~ log10n, data=dfB_HN)
 print(coef(fitB_HN))
 """
 
 R"""
-dfF_HN <- df %>% filter(method=="F", true_distribution=="HalfNormal")
+dfF_HN <- df %>% filter(method=="F", true_distribution=="HalfNormal")%>% filter(n>nb)
 fitF_HN <- lm(log10_rmse ~ log10n, data=dfF_HN)
 print(coef(fitF_HN))
 """

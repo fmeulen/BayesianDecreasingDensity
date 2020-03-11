@@ -28,15 +28,15 @@ include("bd_funcdefs.jl")
 α = 1.0                       # concentration par
 
 # specify simulation settings
-std_mhstep = 0.2 # sd for mh step updating θ
+std_mhstep = 0.4 # sd for mh step updating θ
 
 rmse(x, truedist) = sqrt( mean((x .- pdf(truedist,0.0)).^2) )
 
-IT = 5#_000 # nr of iterations
-NSIM = 10#00
+IT = 10_000 # nr of iterations
+NSIM = 500
 
 methods = ["A", "B", "F"]
-samplesizes = [50, 500, 5000]
+samplesizes = [50, 250]
 truedistributions = [Exponential(), HalfNormal()]
 function label(truedist) # only needed for plotting
     if truedist == Exponential()
@@ -77,30 +77,43 @@ end
 
 
 ############# postprocessing ####################
-df = DataFrame(iter = Float64[], f0=Float64[], method=String[], n=Int64[], true_distribution=String[], true0=Float64[])
+df = DataFrame(simnr = Float64[], f0=Float64[], method=String[], n=Int64[], true_distribution=String[], true0=Float64[])
 for truedistribution in truedistributions
   for n in samplesizes
       for method in methods
           global df
           simrun = load("./out/exp2/"*label(truedistribution)*"_"*string(n)*"_"*string(method)*".jld2")["f0post"]
-          n_sr = length(simrun)
-          df = vcat(df,DataFrame(iter=1:n_sr, f0=simrun,
-                                  method=fill(method,n_sr),
-                                  n= fill(n,n_sr),
-                                  true_distribution = fill(label(truedistribution),n_sr),
-                                  true0 = fill(pdf(truedistribution,0.0),n_sr)
+          df = vcat(df,DataFrame(simnr=1:NSIM, f0=simrun,
+                                  method=fill(method,NSIM),
+                                  n= fill(n,NSIM),
+                                  true_distribution = fill(label(truedistribution),NSIM),
+                                  true0 = fill(pdf(truedistribution,0.0),NSIM)
                                   ))
       end
   end
 end
 
-@rput IT
+
 @rput df
 R"""
-print(class(df))
-df %>% convert(chr(n,method,true_distribution))%>% mutate(method=fct_recode(method, "D" = "F")) %>% # recode F to D to align with article
- dplyr::filter(iter >IT/2) %>%
-   ggplot() +
-   geom_density(aes(x=f0,group=method,fill=method), alpha=0.4) +
-      geom_vline(aes(xintercept= true0),colour="gray",linetype = "dashed")+facet_grid(true_distribution ~n)
+df1 <- df %>% convert(chr(n,method,true_distribution))%>% mutate(method=fct_recode(method, "D" = "F")) %>% # recode F to D to align with article
+    mutate(n=fct_inseq(n))
+
+p1 <- df1 %>% ggplot() +
+   geom_density(aes(x=f0,group=method,fill=method), alpha=0.2,colour='grey') +
+      geom_vline(aes(xintercept= true0),colour="gray",linetype = "dashed") +
+      facet_grid(n ~ true_distribution, scales="free")+xlab("")
+
+
+pdf("res_exp2A.pdf",width=7.5,height=3)
+        show(p1)
+dev.off()
+
+#p2 <- df1 %>%  ggplot() +
+#   geom_boxplot(aes(f0,method, group=method), alpha=0.2) +
+      #geom_vline(aes(xintercept= true0),colour="gray",linetype = "dashed")# +
+      #facet_grid(n ~ true_distribution, scales="free")+xlab("")
+ #pdf("res_exp2B.pdf",width=7.5,height=4.5)
+#              show(p2)
+#      dev.off()
 """

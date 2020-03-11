@@ -1,4 +1,4 @@
-setwd("~/Sync/DOCUMENTS/onderzoek/LiXue/bayesdec_julia/fertility")
+setwd("~/.julia/dev/BayesianDecreasingDensity/scr/out_old/fertility")
 
 library(plyr)
 library(ggplot2)
@@ -8,8 +8,10 @@ library(gridExtra)
 library(tidyverse)
 library(latex2exp)
 
+theme_set(theme_light())
+
 # read the current duration data
-d_init <- read_csv("~/Sync/DOCUMENTS/onderzoek/LiXue/bayesdec_julia/fertility/postmean.csv",col_names = FALSE)
+d_init <- read_csv("./methodD/postmean.csv",col_names = FALSE)
 # columns correspond to different point on the horizontal axis,
 # rows correspond to iterations
 # first row is the grid
