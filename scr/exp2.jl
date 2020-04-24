@@ -105,7 +105,7 @@ p1 <- df1 %>% ggplot() +
       facet_grid(n ~ true_distribution, scales="free")+xlab("")
 
 
-pdf("res_exp2A.pdf",width=7.5,height=3)
+pdf("res_exp2A.pdf",width=7.5,height=3.8)
         show(p1)
 dev.off()
 
