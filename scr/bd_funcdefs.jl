@@ -6,11 +6,11 @@ rand(::HalfNormal,n::Integer) = abs.(randn(n))
 
 
 # Keep track of the configuration at each iteration using Config
-mutable struct Config
+struct Config
     labels::Vector{Int64}               # (z_1,...,z_n)
     tableIDs::Vector{Int64}             # table indices
     counts::Vector{Int64}               # table counts
-    n_tables::Int64                     # nr of tables
+    #n_tables::Int64
     θ::Vector{Float64}                  # parameters
 end
 
@@ -21,7 +21,7 @@ mutable struct ExtraPar
     τ::Float64
 end
 
-makeconfig_init(x) = Config(ones(length(x)),[1], [length(x)],1,[maximum(x)+1])
+makeconfig_init(x) = Config(ones(length(x)),[1], [length(x)],[maximum(x)+1])
 #-------------------------- set prior --------------------------
 """
     Set the prior used in Bayesian estimation of a decreasing density
@@ -116,10 +116,10 @@ function updateconfig(config, x, ψ0, method, ep)
             deleteat!(configN.counts, ind) # remove table from counts vector
             deleteat!(configN.tableIDs,ind) # remove table from tableID vector
             deleteat!(configN.θ,ind) # remove table from θvalues vector
-            configN.n_tables += -1   # decrease total number of tables
+            #configN.n_tables += -1   # decrease total number of tables
         end
 
-        w =[ψ(x[i],configN.θ[j]) * configN.counts[j] for j in 1:configN.n_tables]
+        w =[ψ(x[i],configN.θ[j]) * configN.counts[j] for j in eachindex(configN.θ)  ]
         append!(w, ψ0[i]) # append for opening a new table
 
         # sample new table for customer i proportional to w[i]
@@ -134,7 +134,7 @@ function updateconfig(config, x, ψ0, method, ep)
         if newtable==id_new # open new table
             push!(configN.tableIDs,id_new) #add at the end
             push!(configN.counts,1)
-            configN.n_tables += 1
+        #    configN.n_tables += 1
             push!(configN.θ,sampleθnewtable(x[i],method,ep))  # sample new θ and add it
         else
             configN.counts[ind] +=1
@@ -199,7 +199,7 @@ function updateθtable!(θ,x,std_mhstep,method,ep,base_density)
 end
 
 function updateθ!(config,sum_acc,x,std_mhstep,method,ep,base_density)
-    for k in 1:config.n_tables
+    for k in eachindex(config.θ)  #1:config.n_tables
         # for the k-th table, find all indices of customers on that table
         ind = findall(x->x==config.tableIDs[k], config.labels) # new dec 2019
         acc = updateθtable!(config.θ[k], x[ind],std_mhstep,method,ep,base_density)
@@ -269,7 +269,8 @@ function mcmc(x, method, α, IT, std_mhstep, grid; p=0.05, BI=div(IT,2), config_
         configs[it] = updateconfig(configs[it-1], x, ψ0, method, ep)
         sum_acc = updateθ!(configs[it],sum_acc, x, std_mhstep, method, ep, base_density)
         if md
-            postτ[it] = randtruncgamma(ep.λ + configs[it].n_tables * ep.αα, ep.β, minimum(configs[it].θ))
+            ntables = length(configs[it].θ)
+            postτ[it] = randtruncgamma(ep.λ + ntables * ep.αα, ep.β, minimum(configs[it].θ))
             ep.τ = postτ[it]
         end
 
@@ -280,7 +281,7 @@ function mcmc(x, method, α, IT, std_mhstep, grid; p=0.05, BI=div(IT,2), config_
     end
 
     # compute average acc prob for mh updates for theta
-    nθupdates = sum([configs[it].n_tables for it in 2:IT])
+        nθupdates = sum([length(configs[it].θ) for it in 2:IT])
     mean_acc = sum_acc/nθupdates
 
     postmean_BI = postmean[BI:IT,:]
