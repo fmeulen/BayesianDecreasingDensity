@@ -114,6 +114,34 @@ pdf("rate_at0_comparison.pdf",width=7.5,height=3.6)
 dev.off()
 """
 
+R"""
+# make dataframe to add best fit lines with slope `-sl`
+
+sl1 = 2/9
+sl2 = 3/9
+
+dfintercept <- df  %>%  mutate(method=fct_recode(method, "D" = "F"))%>%
+ mutate(diff1 = log10_rmse + sl1*log10n) %>%
+ mutate(diff2 = log10_rmse + sl2*log10n) %>%
+ group_by(method, true_distribution) %>%
+ summarise(interc1=mean(diff1),interc2=mean(diff2))
+print(dfintercept)
+
+p <- df %>%  mutate(method=fct_recode(method, "D" = "F")) %>%
+      ggplot(aes(x=log10n, y = log10_rmse,colour=method)) + geom_point() +
+        stat_smooth(method = "lm", se=TRUE, size=0.5) +
+         geom_abline(data=dfintercept, aes(intercept = interc1, slope = -sl1),linetype='dashed') +
+         geom_abline(data=dfintercept, aes(intercept = interc2, slope = -sl2),linetype='dotted') +
+          facet_grid(true_distribution~method,scales='free') +
+        theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5),legend.position = 'none') +
+        xlab(TeX("$\\log_{10}(n)$")) + ylab(TeX("$\\log_{10}(RMSE(n))$"))
+pdf("rate_at0_comparison2.pdf",width=7.5,height=4.3)
+  show(p)
+dev.off()
+"""
+
+
 println("Exponential distribution:")
 @rput df
 R"""
